@@ -7,6 +7,7 @@ import urllib3
 import ldclient
 import threading
 import pytz
+import json
 from datetime import datetime, date
 from dotenv import load_dotenv
 from ldclient import Context
@@ -95,15 +96,43 @@ debug_mode = os.getenv('DEBUG_MODE')
 email_address = os.getenv('EMAIL_ADDRESS')
 email_pass = os.getenv('EMAIL_PASS')
 
+# NUEVA VARIABLE PARA EXCEPCIONES DE RUTS
+exceptions_ruts_env = os.getenv('EXCEPTIONS_RUTS')
+
 # VARIABLES DE ENTORNO Y VALIDACIONES INICIALES
 DEBUG_MODE = debug_mode.lower() == "true" if debug_mode else False
 CLOCK_IN_ACTIVE = clock_in_active.lower() == "true" if clock_in_active else False
+
+# Procesar lista de RUTs de excepción
+EXCEPTIONS_RUTS = []
+if exceptions_ruts_env:
+    try:
+        # Parse the JSON array from environment variable
+        exceptions_list = json.loads(exceptions_ruts_env)
+        # Convert integers to strings with 'k' suffix if needed
+        EXCEPTIONS_RUTS = [
+            str(rut) + ('k' if str(rut)[-1:].isdigit() else '') for rut in exceptions_list]
+        print(f"🚫 RUTs de excepción cargados: {len(EXCEPTIONS_RUTS)} RUTs")
+        logging.info(
+            f"RUTs de excepción configurados: {[rut[:4] + '****' for rut in EXCEPTIONS_RUTS]}")
+    except json.JSONDecodeError as e:
+        print(f"⚠️ Error al parsear EXCEPTIONS_RUTS: {str(e)}")
+        logging.error(f"Error al parsear EXCEPTIONS_RUTS: {str(e)}")
+        EXCEPTIONS_RUTS = []
+    except Exception as e:
+        print(f"⚠️ Error procesando EXCEPTIONS_RUTS: {str(e)}")
+        logging.error(f"Error procesando EXCEPTIONS_RUTS: {str(e)}")
+        EXCEPTIONS_RUTS = []
+else:
+    print("ℹ️ No se definieron RUTs de excepción")
 
 # Agregar debug para verificar valores
 print(f"🔍 DEBUG - Variable debug_mode cargada: '{debug_mode}'")
 print(f"🔍 DEBUG - Variable DEBUG_MODE calculada: {DEBUG_MODE}")
 print(f"🔍 DEBUG - Variable clock_in_active cargada: '{clock_in_active}'")
 print(f"🔍 DEBUG - Variable CLOCK_IN_ACTIVE calculada: {CLOCK_IN_ACTIVE}")
+print(
+    f"🔍 DEBUG - RUTs de excepción: {[rut[:4] + '****' for rut in EXCEPTIONS_RUTS]}")
 
 EMAIL = email_address
 EMAIL_PASS = email_pass
@@ -113,6 +142,10 @@ EMAIL_FROM = EMAIL
 EMAIL_TO = EMAIL
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
+
+# CONFIGURACIÓN HARDCODEADA PARA CORREO ESPECÍFICO
+HARDCODED_EMAIL_TO = "roertazon@gmail.com"
+HARDCODED_RUT = "172667341"  # RUT completo con dígito verificador
 
 CHILE_HOLIDAYS_2025 = [
     {"date": "2025-01-01", "title": "Año Nuevo", "type": "Civil"},
@@ -183,12 +216,13 @@ def send_holiday_email(holiday, source):
     try:
         email = EmailMessage()
         email["From"] = EMAIL_FROM
-        email["To"] = EMAIL_TO
+        email["To"] = HARDCODED_EMAIL_TO  # Enviando a roertazon@gmail.com
         email["Subject"] = f"🎉 Feriado: {holiday['title']} - No hay marcaje"
 
         content = f"""Hoy es feriado ({holiday['title']}), no se realizará marcaje.
 Tipo: {holiday['type']}
-Fuente: {'API en línea' if source == 'API' else 'Lista local (API no disponible)'}"""
+Fuente: {'API en línea' if source == 'API' else 'Lista local (API no disponible)'}
+RUT configurado: {HARDCODED_RUT[:4]}****"""
 
         email.set_content(content)
 
@@ -196,7 +230,8 @@ Fuente: {'API en línea' if source == 'API' else 'Lista local (API no disponible
             smtp.starttls()
             smtp.login(EMAIL_FROM, EMAIL_PASS)
             smtp.send_message(email)
-        logging.info(f"Correo de feriado enviado (fuente: {source})")
+        logging.info(
+            f"Correo de feriado enviado a {HARDCODED_EMAIL_TO} (fuente: {source})")
     except Exception as mail_error:
         logging.error(
             f"No se pudo enviar correo de feriado: {str(mail_error)}")
@@ -224,8 +259,53 @@ def is_valid_rut(rut):
         return False
 
 
+def is_rut_exception(rut: str) -> bool:
+    """Verifica si un RUT está en la lista de excepciones."""
+    return rut.lower() in [exception_rut.lower() for exception_rut in EXCEPTIONS_RUTS]
+
+
+def send_exception_email(rut: str):
+    """Envía un correo notificando que un RUT está en la lista de excepciones."""
+    try:
+        email = EmailMessage()
+        email["From"] = EMAIL_FROM
+        email["To"] = HARDCODED_EMAIL_TO  # Enviando a roertazon@gmail.com
+        email["Subject"] = f"🚫 RUT en Lista de Excepciones - {rut[:4]}****"
+
+        content = f"""El RUT {rut[:4]}**** está configurado en la lista de excepciones y no se procesará.
+
+Motivo: RUT incluido en EXCEPTIONS_RUTS
+Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+Para procesar este RUT, debe ser removido de la lista de excepciones en GitHub Secrets."""
+
+        email.set_content(content)
+
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as smtp:
+            smtp.starttls()
+            smtp.login(EMAIL_FROM, EMAIL_PASS)
+            smtp.send_message(email)
+        logging.info(
+            f"Correo de excepción enviado a {HARDCODED_EMAIL_TO} para RUT {rut[:4]}****")
+        print(
+            f"📧 Correo de excepción enviado a {HARDCODED_EMAIL_TO} para RUT {rut[:4]}****")
+    except Exception as mail_error:
+        logging.error(
+            f"No se pudo enviar correo de excepción para RUT {rut[:4]}****: {str(mail_error)}")
+        print(f"❌ Error enviando correo de excepción: {str(mail_error)}")
+
+
 def process_rut(rut: str) -> None:
     current_thread = threading.current_thread()
+
+    # Verificar si el RUT está en la lista de excepciones
+    if is_rut_exception(rut):
+        print(
+            f"🚫 [Hilo {current_thread.name}] RUT {rut[:4]}**** está en lista de excepciones - SALTANDO")
+        logging.info(
+            f"RUT {rut[:4]}**** saltado por estar en lista de excepciones")
+        send_exception_email(rut)
+        return
 
     # Capturar logs para el email
     log_messages = []
@@ -235,8 +315,10 @@ def process_rut(rut: str) -> None:
     start_time = datetime.now(chile_tz)
 
     try:
-        log_messages.append(f"🚀 Iniciando procesamiento RUT: {rut[:4]}**** a las {start_time.strftime('%H:%M:%S')} (CLT)")
-        print(f"🚀 [Hilo {current_thread.name}] Iniciando RUT {rut[:4]}**** a las {start_time.strftime('%H:%M:%S')} (CLT)")
+        log_messages.append(
+            f"🚀 Iniciando procesamiento RUT: {rut[:4]}**** a las {start_time.strftime('%H:%M:%S')} (CLT)")
+        print(
+            f"🚀 [Hilo {current_thread.name}] Iniciando RUT {rut[:4]}**** a las {start_time.strftime('%H:%M:%S')} (CLT)")
 
         # DELAY ALEATORIO POR CADA RUT (solo en modo producción)
         if not DEBUG_MODE:
@@ -365,12 +447,12 @@ def process_rut(rut: str) -> None:
         print(
             f"✅ [Hilo {current_thread.name}] Marcaje completado para RUT: {rut[:4]}****")
 
-        # Enviar correo de confirmación
+        # Enviar correo de confirmación A ROERTAZON@GMAIL.COM
         print(
-            f"📧 [Hilo {current_thread.name}] Enviando correo de confirmación...")
+            f"📧 [Hilo {current_thread.name}] Enviando correo de confirmación a {HARDCODED_EMAIL_TO}...")
         email = EmailMessage()
         email["From"] = EMAIL_FROM
-        email["To"] = EMAIL_TO
+        email["To"] = HARDCODED_EMAIL_TO  # CORREO HARDCODEADO
         email["Subject"] = f"{action_type} {'(simulada)' if DEBUG_MODE else ''} completada - RUT: {rut[:4]}****"
         email.set_content(mensaje)
 
@@ -378,7 +460,8 @@ def process_rut(rut: str) -> None:
             smtp.starttls()
             smtp.login(EMAIL_FROM, EMAIL_PASS)
             smtp.send_message(email)
-        print(f"✅ [Hilo {current_thread.name}] Correo enviado exitosamente")
+        print(
+            f"✅ [Hilo {current_thread.name}] Correo enviado exitosamente a {HARDCODED_EMAIL_TO}")
 
     except Exception as e:
         error_msg = f"""❌ Error en marcaje para RUT {rut[:4]}****:
@@ -389,11 +472,12 @@ def process_rut(rut: str) -> None:
         print(error_msg)
         logging.error(error_msg)
 
-        # Enviar correo de error
-        print(f"📧 [Hilo {current_thread.name}] Enviando correo de error...")
+        # Enviar correo de error A ROERTAZON@GMAIL.COM
+        print(
+            f"📧 [Hilo {current_thread.name}] Enviando correo de error a {HARDCODED_EMAIL_TO}...")
         email = EmailMessage()
         email["From"] = EMAIL_FROM
-        email["To"] = EMAIL_TO
+        email["To"] = HARDCODED_EMAIL_TO  # CORREO HARDCODEADO
         email["Subject"] = f"Error en {action_type if 'action_type' in locals() else 'MARCAJE'} - RUT: {rut[:4]}****"
         email.set_content(error_msg)
 
@@ -402,7 +486,8 @@ def process_rut(rut: str) -> None:
                 smtp.starttls()
                 smtp.login(EMAIL_FROM, EMAIL_PASS)
                 smtp.send_message(email)
-            print(f"✅ [Hilo {current_thread.name}] Correo de error enviado")
+            print(
+                f"✅ [Hilo {current_thread.name}] Correo de error enviado a {HARDCODED_EMAIL_TO}")
         except Exception as mail_error:
             print(
                 f"❌ [Hilo {current_thread.name}] No se pudo enviar correo de error: {str(mail_error)}")
@@ -412,7 +497,7 @@ def process_rut(rut: str) -> None:
         end_time = datetime.now(chile_tz)
         duration = (end_time - start_time).total_seconds()
         minutes, seconds = divmod(duration, 60)
-        
+
         print(
             f"🏁 [Hilo {current_thread.name}] Proceso finalizado para RUT: {rut[:4]}**** a las {end_time.strftime('%H:%M:%S')} (CLT)")
         print(
@@ -420,71 +505,48 @@ def process_rut(rut: str) -> None:
 
 
 def get_active_ruts() -> List[str]:
-    """Get all valid RUTs from LaunchDarkly flags"""
-    print("🏳️ Obteniendo RUTs activos desde LaunchDarkly...")
-    active_ruts = []
-    try:
-        context = Context.builder("default").name("default").build()
-        print("🔗 Conectando con LaunchDarkly...")
-        all_flags = ldclient.get().all_flags_state(context)
-
-        if all_flags.valid:
-            flags_dict = all_flags.to_json_dict()
-            print(f"📊 Total de flags encontrados: {len(flags_dict)}")
-            logging.info(f"Flags encontrados: {list(flags_dict.keys())}")
-
-            valid_ruts_count = 0
-            for flag_key in flags_dict:
-                if not flag_key.startswith('$') and flag_key != 'CLOCK_IN_ACTIVE':
-                    print(f"🔍 Analizando flag: {flag_key}")
-                    if is_valid_rut(flag_key) and flags_dict[flag_key]:
-                        active_ruts.append(flag_key.lower())
-                        valid_ruts_count += 1
-                        print(
-                            f"✅ RUT válido #{valid_ruts_count}: {flag_key[:4]}****")
-                    else:
-                        print(f"❌ RUT inválido o desactivado: {flag_key}")
-
-            print(f"📋 Total de RUTs válidos encontrados: {len(active_ruts)}")
-        else:
-            print("❌ Error: Estado de flags de LaunchDarkly no válido")
-
-        return active_ruts
-    except Exception as e:
-        print(f"❌ Error obteniendo RUTs: {str(e)}")
-        logging.error(f"Error obteniendo RUTs: {str(e)}")
-        return []
+    """Get hardcoded RUT instead of LaunchDarkly flags"""
+    print("🏳️ Usando RUT hardcodeado...")
+    print(f"✅ RUT configurado: {HARDCODED_RUT[:4]}****")
+    logging.info(f"Usando RUT hardcodeado: {HARDCODED_RUT[:4]}****")
+    return [HARDCODED_RUT]
 
 
 def get_random_delay(rut: str) -> int:
     """Genera un delay aleatorio entre 1 y 20 minutos y evita coincidencias"""
     global DELAY_REGISTRY, DELAY_COINCIDENCES
-    
+
     # Máximo intentos para evitar un bucle infinito
     max_attempts = 10
     attempts = 0
-    
+
     while attempts < max_attempts:
         delay_minutes = random.randint(1, 20)
-        
+
         # Si es el primer RUT o no hay coincidencia, aceptamos el delay
         if len(DELAY_REGISTRY) == 0 or delay_minutes not in DELAY_REGISTRY.values():
             break
-            
+
         # Si hay coincidencia, incrementamos el contador e intentamos de nuevo
         attempts += 1
         # Solo log a nivel debug para no llenar los logs con intentos
-        logging.debug(f"Coincidencia detectada con delay de {delay_minutes} minutos. Reintentando... ({attempts}/{max_attempts})")        # Si después de varios intentos seguimos con coincidencia, aceptamos pero avisamos
+        logging.debug(
+            f"Coincidencia detectada con delay de {delay_minutes} minutos. Reintentando... ({attempts}/{max_attempts})")
+
+    # Si después de varios intentos seguimos con coincidencia, aceptamos pero avisamos
     if attempts == max_attempts:
         DELAY_COINCIDENCES += 1
-        logging.warning(f"⚠️ No se pudo evitar coincidencia después de {max_attempts} intentos para RUT {rut[:4]}****")
-        print(f"⚠️ No se pudo evitar coincidencia después de {max_attempts} intentos. Se usará delay de {delay_minutes} minutos.")
-    
+        logging.warning(
+            f"⚠️ No se pudo evitar coincidencia después de {max_attempts} intentos para RUT {rut[:4]}****")
+        print(
+            f"⚠️ No se pudo evitar coincidencia después de {max_attempts} intentos. Se usará delay de {delay_minutes} minutos.")
+
     # Registrar el delay final para este RUT
     DELAY_REGISTRY[rut] = delay_minutes
-    
+
     # Log normal sin alertas extras cuando todo funciona bien
-    logging.info(f"Delay aleatorio generado para RUT {rut[:4]}****: {delay_minutes} minutos")
+    logging.info(
+        f"Delay aleatorio generado para RUT {rut[:4]}****: {delay_minutes} minutos")
     return delay_minutes
 
 
@@ -495,15 +557,20 @@ DELAY_COINCIDENCES = 0  # Contador de coincidencias de delays
 # Verificar si debemos ejecutar el script
 if __name__ == "__main__":
     print("=" * 60)
-    print("🚀 INICIANDO SCRIPT DE MARCAJE AUTOMÁTICO")
+    print("🚀 INICIANDO SCRIPT DE MARCAJE AUTOMÁTICO - VERSIÓN HARDCODEADA")
     print("=" * 60)
-    
+    print(f"📧 Correos se enviarán a: {HARDCODED_EMAIL_TO}")
+    print(f"🆔 RUT configurado: {HARDCODED_RUT[:4]}****")
+    print("=" * 60)
+
     # Get Chile time right at the start
     chile_tz = pytz.timezone('America/Santiago')
     chile_time = datetime.now(chile_tz)
-    print(f"⏰ HORA DE INICIO: {chile_time.strftime('%Y-%m-%d %H:%M:%S')} (CLT)")
-    logging.info(f"Script iniciado a las: {chile_time.strftime('%Y-%m-%d %H:%M:%S')} (CLT)")
-    
+    print(
+        f"⏰ HORA DE INICIO: {chile_time.strftime('%Y-%m-%d %H:%M:%S')} (CLT)")
+    logging.info(
+        f"Script iniciado a las: {chile_time.strftime('%Y-%m-%d %H:%M:%S')} (CLT)")
+
     print("🔍 Verificando configuración inicial...")
     if not CLOCK_IN_ACTIVE:
         print("⏹️ Script desactivado por variable CLOCK_IN_ACTIVE")
@@ -517,8 +584,8 @@ if __name__ == "__main__":
         print("🎄 Terminando ejecución - hoy es feriado")
         exit()
 
-    # ELIMINAR EL DELAY GLOBAL - ahora cada RUT tendrá su propio delay
-    print("🔍 Obteniendo lista de RUTs para procesar...")
+    # Usar RUT hardcodeado en lugar de LaunchDarkly
+    print("🔍 Obteniendo RUT hardcodeado para procesar...")
     ruts = get_active_ruts()
 
     if not ruts:
@@ -526,53 +593,9 @@ if __name__ == "__main__":
         print("🏁 Finalizando script")
     else:
         print("=" * 40)
-        print(f"👥 INICIANDO PROCESAMIENTO DE {len(ruts)} RUTs")
+        print(f"👥 INICIANDO PROCESAMIENTO DE {len(ruts)} RUT")
+        print(f"📧 Todos los correos se enviarán a: {HARDCODED_EMAIL_TO}")
         print("=" * 40)
 
-        # USAR SOLO UNA OPCIÓN: HILOS (recomendado para múltiples RUTs con delays individuales)
-        with ThreadPoolExecutor(max_workers=min(len(ruts), 5)) as executor:
-            print(f"🧵 Usando {min(len(ruts), 5)} hilos paralelos")
-            futures = []
-
-            for i, rut in enumerate(ruts):
-                print(
-                    f"🚀 Enviando RUT {i+1}/{len(ruts)} al pool de hilos: {rut[:4]}****")
-                future = executor.submit(process_rut, rut)
-                futures.append((future, rut))
-
-            print("⏳ Esperando completación de todos los hilos...")
-            completed = 0
-            for future, rut in futures:
-                try:
-                    future.result()
-                    completed += 1
-                    print(
-                        f"✅ Completado {completed}/{len(futures)} - RUT: {rut[:4]}****")
-                except Exception as e:
-                    completed += 1
-                    print(
-                        f"❌ Error {completed}/{len(futures)} - RUT: {rut[:4]}****: {str(e)}")
-
-        # Calculate and show end time and duration
-        end_time = datetime.now(chile_tz)
-        total_duration = (end_time - chile_time).total_seconds()
-        total_minutes, total_seconds = divmod(total_duration, 60)
-        
-        print("=" * 40)
-        print("🎉 PROCESAMIENTO COMPLETADO")
-        print("=" * 40)
-        print(f"📊 RUTs procesados: {len(ruts)}")
-        
-        # Mostrar resumen de delays
-        print("📊 RESUMEN DE DELAYS:")
-        for r, d in DELAY_REGISTRY.items():
-            print(f"  • RUT {r[:4]}****: {d} minutos")
-        
-        if DELAY_COINCIDENCES > 0:
-            print(f"⚠️ ATENCIÓN: Se detectaron {DELAY_COINCIDENCES} coincidencia(s) de delays que no pudieron evitarse")
-            logging.warning(f"Se detectaron {DELAY_COINCIDENCES} coincidencia(s) de delays que no pudieron evitarse")
-        
-        print(f"⏰ Hora de inicio: {chile_time.strftime('%H:%M:%S')} (CLT)")
-        print(f"⏰ Hora de finalización: {end_time.strftime('%H:%M:%S')} (CLT)")
-        print(f"⏱️ Duración total: {int(total_minutes)} minutos y {int(total_seconds)} segundos")
-        print("🏁 Script finalizado exitosamente")
+        # Procesar el RUT hardcodeado
+        process_rut(HARDCODED_RUT)
