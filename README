@@ -1,6 +1,31 @@
-# Descripción
+# good-friend-test
 
-Script simple para pruebas de programación. Incompleto y con errores.
+Sistema de marcaje automático modularizado para Chile.
+
+## Estructura del Proyecto
+
+```
+good-friend/
+├── main.py
+├── config.py
+├── services/
+│   ├── __init__.py
+│   ├── email_service.py
+│   ├── holiday_service.py
+│   └── marcaje_service.py
+├── utils/
+│   ├── __init__.py
+│   ├── delay_manager.py
+│   └── rut_validator.py
+├── tests/
+│   ├── __init__.py
+│   └── test_debug.py
+├── logs/
+├── __init__.py
+├── requirements.txt
+├── .env
+└── README
+```
 
 ## Configuración
 
@@ -8,4 +33,14 @@ Script simple para pruebas de programación. Incompleto y con errores.
 pip install -r requirements.txt
 ```
 
-_No mantenido, solo para propósitos de prueba_
+## Uso
+
+```bash
+python main.py
+```
+
+## Testing
+
+```bash
+python tests/test_debug.py
+```

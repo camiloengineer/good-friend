@@ -7,7 +7,6 @@
 # Archivos de logs
 *.log
 marcaje.log
-
 # Archivos del sistema operativo
 .DS_Store
 Thumbs.db
