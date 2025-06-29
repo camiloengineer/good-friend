@@ -1,6 +1,8 @@
-# good-friend-test
+# good-friend [marcacion-automatizada]
 
-Sistema de marcaje automático modularizado para Chile.
+Sistema de marcaje automático que probablemente no funciona bien.
+Proyecto de práctica siguiendo un tutorial de YouTube. 
+Muchos bugs sin resolver. No recomendado para uso real.
 
 ## Estructura del Proyecto
 
@@ -19,7 +21,7 @@ good-friend/
 │   └── rut_validator.py
 ├── tests/
 │   ├── __init__.py
-│   └── test_debug.py
+│   └── test_email_service.py
 ├── logs/
 ├── __init__.py
 ├── requirements.txt
@@ -42,5 +44,5 @@ python main.py
 ## Testing
 
 ```bash
-python tests/test_debug.py
+pytest tests/ -v
 ```

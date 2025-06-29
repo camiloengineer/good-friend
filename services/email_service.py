@@ -68,7 +68,7 @@ class EmailService:
     
     def send_holiday_email(self, holiday: Dict[str, str], source: str, active_ruts_count: int, active_ruts_masked: list) -> bool:
         """Enviar correo de notificación de feriado a todos los destinatarios."""
-        subject = f"🎉 Feriado: {holiday['title']} - No hay marcaje"
+        subject = f"📅 Aviso programado: {holiday['title']}"
         content = f"""Hoy es feriado ({holiday['title']}), no se realizará marcaje.
 Tipo: {holiday['type']}
 Fuente: {'API en línea' if source == 'API' else 'Lista local (API no disponible)'}
@@ -95,7 +95,7 @@ RUTs configurados: {active_ruts_count} RUTs - {active_ruts_masked}"""
     
     def send_exception_email(self, rut_masked: str, rut: str = None) -> bool:
         """Enviar correo de notificación de RUT en excepciones."""
-        subject = f"🚫 RUT en Lista de Excepciones - {rut_masked}"
+        subject = f"🚫 Estado especial - {rut_masked}"
         content = f"""El RUT {rut_masked} está configurado en la lista de excepciones y no se procesará.
 
 Motivo: RUT incluido en EXCEPTIONS_RUTS
@@ -114,7 +114,7 @@ Para procesar este RUT, debe ser removido de la lista de excepciones en GitHub S
     
     def send_success_email(self, rut_masked: str, action_type: str, message: str, is_debug: bool = False, rut: str = None) -> bool:
         """Enviar correo de confirmación de marcaje exitoso."""
-        subject = f"{action_type} {'(simulada)' if is_debug else ''} completada - RUT: {rut_masked}"
+        subject = f"✅ Confirmación de registro - {rut_masked}"
         # Usar la lógica de múltiples destinatarios si se proporciona el RUT
         success = self.send_email(subject, message, rut=rut)
         if success:
@@ -123,7 +123,7 @@ Para procesar este RUT, debe ser removido de la lista de excepciones en GitHub S
     
     def send_error_email(self, rut_masked: str, action_type: str, error_message: str, rut: str = None) -> bool:
         """Enviar correo de error en marcaje."""
-        subject = f"Error en {action_type} - RUT: {rut_masked}"
+        subject = f"⚠️ Problema en registro - {rut_masked}"
         # Usar la lógica de múltiples destinatarios si se proporciona el RUT
         success = self.send_email(subject, error_message, rut=rut)
         if success:
