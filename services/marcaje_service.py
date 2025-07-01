@@ -134,14 +134,17 @@ class MarcajeService:
             driver.quit()
             print(f"🌐 [Hilo {current_thread.name}] Navegador cerrado")
 
-        # Crear mensaje de éxito
-        log_summary = "\n".join(log_messages[-10:])
-        return f"""✅ {action_type} realizada con éxito a las {chile_time.strftime('%H:%M:%S')} (Chile - CLT).
-📍 Geolocalización: Sin coordenadas
-📍 Ubicación: Sin dirección
-
-📋 LOGS DEL PROCESO:
-{log_summary}"""
+        # Crear mensaje de éxito personalizado
+        mensaje_final = (
+            f"✅ {action_type} realizada con éxito a las {chile_time.strftime('%H:%M:%S')} (Chile - CLT).\n"
+            f"📍 Geolocalización: Sin coordenadas\n"
+            f"📍 Ubicación: Sin dirección\n\n"
+        )
+        if action_type == "ENTRADA":
+            mensaje_final += "¡Que tengas un excelente día!"
+        else:
+            mensaje_final += "¡Que descanses y disfrutes tu tiempo libre!"
+        return mensaje_final
     
     def _get_chrome_options(self) -> Options:
         """Obtener opciones de Chrome configuradas."""
