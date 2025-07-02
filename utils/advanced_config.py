@@ -58,15 +58,11 @@ class AdvancedConfig(Config):
     
     def should_use_parallel_processing(self) -> bool:
         """Determinar si se debe usar procesamiento paralelo."""
-        return (self.execution_config.parallel_execution and 
-                len(self.ACTIVE_RUTS) > 1 and 
-                not self.DEBUG_MODE)  # No paralelizar en modo debug
+        return len(self.ACTIVE_RUTS) > 1  # Siempre paralelizar si hay más de un RUT
     
-    def get_thread_pool_executor(self) -> Optional[ThreadPoolExecutor]:
+    def get_thread_pool_executor(self) -> ThreadPoolExecutor:
         """Obtener executor para procesamiento paralelo."""
-        if self.should_use_parallel_processing():
-            return ThreadPoolExecutor(max_workers=self.execution_config.max_workers)
-        return None
+        return ThreadPoolExecutor(max_workers=self.execution_config.max_workers)
     
     def print_advanced_debug_info(self):
         """Imprimir información de debug avanzada."""
@@ -74,24 +70,17 @@ class AdvancedConfig(Config):
         
         print("\n🔧 CONFIGURACIÓN AVANZADA:")
         exec_config = self.execution_config
-        print(f"   Procesamiento paralelo: {'✅ Habilitado' if exec_config.parallel_execution else '❌ Deshabilitado'}")
+        print(f"   Procesamiento paralelo: ✅ Siempre habilitado")
         print(f"   Max workers: {exec_config.max_workers}")
         print(f"   Intentos de retry: {exec_config.retry_attempts}")
         print(f"   Delay entre retries: {exec_config.retry_delay_seconds}s")
         print(f"   Circuit breaker threshold: {exec_config.circuit_breaker_threshold}")
         print(f"   Métricas habilitadas: {'✅ Sí' if exec_config.enable_metrics else '❌ No'}")
         
-        if self.should_use_parallel_processing():
+        if len(self.ACTIVE_RUTS) > 1:
             print(f"🚀 Se usará procesamiento PARALELO con {exec_config.max_workers} workers")
         else:
-            reasons = []
-            if not exec_config.parallel_execution:
-                reasons.append("no habilitado")
-            if len(self.ACTIVE_RUTS) <= 1:
-                reasons.append("solo 1 RUT")
-            if self.DEBUG_MODE:
-                reasons.append("modo DEBUG")
-            print(f"🔄 Se usará procesamiento SECUENCIAL ({', '.join(reasons)})")
+            print(f"🔄 Se usará procesamiento para un solo RUT")
 
 
 class CircuitBreaker:

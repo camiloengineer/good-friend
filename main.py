@@ -123,18 +123,18 @@ def main():
     print(f"📧 Email especial: {config.get_special_email() or 'No configurado'}")
     print("=" * 40)
 
-    # Procesar RUTs (secuencial o paralelo según configuración)
+    # Procesar RUTs (siempre en paralelo si hay más de uno)
     print("=" * 40)
     print(f"👥 INICIANDO PROCESAMIENTO DE {len(ruts)} RUTs")
     print(f"📧 Email principal: {config.get_email_address()}")
     print(f"📧 Email especial: {config.get_special_email() or 'No configurado'}")
     print("=" * 40)
 
-    if config.should_use_parallel_processing():
+    if len(ruts) > 1:
         print(f"🚀 Usando procesamiento PARALELO con {config.execution_config.max_workers} workers")
         success_count = process_ruts_parallel(marcaje_service, ruts, config.execution_config.max_workers)
     else:
-        print("🔄 Usando procesamiento SECUENCIAL")
+        print("🔄 Usando procesamiento para un solo RUT")
         success_count = process_ruts_sequential(marcaje_service, ruts)
     
     # Mostrar estadísticas finales
