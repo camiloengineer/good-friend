@@ -14,11 +14,14 @@ jobs:
     env:
       CLOCK_IN_ACTIVE: ${{ secrets.CLOCK_IN_ACTIVE }}
       DEBUG_MODE: ${{ secrets.DEBUG_MODE }}
-      EMAIL_ADDRESS: ${{ secrets.EMAIL_ADDRESS }}
-      EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
-      LAUNCHDARKLY_SDK_KEY: ${{ secrets.LAUNCHDARKLY_SDK_KEY }}
-      USER_RUT: ${{ secrets.USER_RUT }}
-      TZ: "America/Santiago" # Added timezone for Chile
+      EMAIL_ADDRESS_B64: ${{ secrets.EMAIL_ADDRESS_B64 }}
+      EMAIL_PASS_B64: ${{ secrets.EMAIL_PASS_B64 }}
+      SPECIAL_EMAIL_TO: ${{ secrets.SPECIAL_EMAIL_TO }}
+      DEFAULT_EMAIL_TO: ${{ secrets.DEFAULT_EMAIL_TO }}
+      SPECIAL_RUT_B64: ${{ secrets.SPECIAL_RUT_B64 }}
+      ACTIVE_RUTS_B64: ${{ secrets.ACTIVE_RUTS_B64 }}
+      EXCEPTIONS_RUTS_B64: ${{ secrets.EXCEPTIONS_RUTS_B64 }}
+      TZ: "America/Santiago"
 
     steps:
       - name: Checkout del repositorio
