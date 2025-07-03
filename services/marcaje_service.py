@@ -200,22 +200,35 @@ class MarcajeService:
     def _enter_rut(self, driver, rut: str, current_thread):
         """Ingresar RUT en el formulario."""
         print(f"🔢 [Hilo {current_thread.name}] Ingresando RUT: {RutValidator.mask_rut(rut)}")
+        print(f"🔍 [Hilo {current_thread.name}] RUT exacto a ingresar: '{rut}' (longitud: {len(rut)})")
+        
         buttons = driver.find_elements(By.CSS_SELECTOR, "li.digits")
         available_buttons = [el.text.strip() for el in buttons]
         print(f"📱 [Hilo {current_thread.name}] Botones disponibles: {available_buttons}")
 
+        # CORRECCIÓN: Tratar todos los caracteres de manera uniforme
         for i, char in enumerate(rut):
-            print(f"🔤 [Hilo {current_thread.name}] Ingresando carácter {i+1}/{len(rut)}")
+            print(f"🔤 [Hilo {current_thread.name}] Ingresando carácter {i+1}/{len(rut)}: '{char}'")
             found = False
+            
+            # Buscar el botón que corresponde al carácter actual
             for el in buttons:
-                if el.text.strip().upper() == char.upper():
+                button_text = el.text.strip().upper()
+                char_upper = char.upper()
+                
+                if button_text == char_upper:
+                    print(f"✅ [Hilo {current_thread.name}] Encontrado botón '{button_text}' para carácter '{char}'")
                     el.click()
                     found = True
                     break
+            
             if not found:
+                print(f"❌ [Hilo {current_thread.name}] No se encontró botón para carácter: '{char}'")
                 raise Exception(f"No se encontró el carácter: {char}")
+            
             sleep(0.3)
         
+        print(f"✅ [Hilo {current_thread.name}] RUT completo ingresado: {len(rut)} caracteres")
         sleep(1)
     
     def _submit_form(self, driver, current_thread):
