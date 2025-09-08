@@ -9,6 +9,9 @@ on:
     # HORARIO DE INVIERNO (marzo - septiembre): UTC-4 (comentado)
     # - cron: "10 12 * * 1-5" # 08:10 CLT (Lunes a Viernes) - INVIERNO
     # - cron: "30 21 * * 1-5" # 17:30 CLT (Lunes a Viernes) - INVIERNO
+    
+    # Mantener repositorio activo - cada 15 días a las 6:00 UTC (3:00 CLT)
+    - cron: "0 6 1,15 * *" # Día 1 y 15 de cada mes
   
   # push:
   #   branches: ["main"]
@@ -25,8 +28,44 @@ on:
           - "true"
 
 jobs:
+  # Job para mantener el repositorio activo
+  keep-alive:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 6 1,15 * *'
+    permissions:
+      contents: write  # Necesario para hacer push
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configurar Git
+        run: |
+          git config --local user.email "camilo@camiloengineer.com"
+          git config --local user.name "Camilo González"
+
+      - name: Actualizar timestamp de keep-alive
+        run: |
+          echo "# Keep Alive" > .github/keep-alive.txt
+          echo "Last update: $(date -u)" >> .github/keep-alive.txt
+          echo "Run number: ${{ github.run_number }}" >> .github/keep-alive.txt
+          echo "Maintaining repository activity to prevent workflow deactivation" >> .github/keep-alive.txt
+
+      - name: Commit y push cambios
+        run: |
+          git add .github/keep-alive.txt
+          if git diff --staged --quiet; then
+            echo "No hay cambios para commit"
+          else
+            git commit -m "chore: update keep-alive timestamp [skip ci]"
+            git push
+            echo "✅ Keep-alive commit realizado exitosamente"
+          fi
+
   marcar-turno:
     runs-on: ubuntu-latest
+    if: github.event.schedule != '0 6 1,15 * *'
     timeout-minutes: 60  # 1 hora - Tiempo suficiente para procesos de marcaje
     env:
       CLOCK_IN_ACTIVE: ${{ secrets.CLOCK_IN_ACTIVE }}
