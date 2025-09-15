@@ -22,7 +22,6 @@ def test_rut_colega():
     config = Config()
     
     print(f"📋 RUTs activos: {config.ACTIVE_RUTS}")
-    print(f"📋 RUTs excepciones: {config.EXCEPTIONS_RUTS}")
     print(f"📋 DEBUG_MODE: {config.DEBUG_MODE}")
     print()
     
@@ -50,7 +49,7 @@ def test_rut_colega():
     
     try:
         # Procesar SOLO el RUT del colega
-        marcaje_service.process_rut(rut_colega, config.EXCEPTIONS_RUTS)
+        marcaje_service.process_rut(rut_colega)
         print("✅ Procesamiento completado exitosamente")
         
     except Exception as e:

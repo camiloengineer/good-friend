@@ -76,7 +76,6 @@ jobs:
       DEFAULT_EMAIL_TO: ${{ secrets.DEFAULT_EMAIL_TO }}
       SPECIAL_RUT_B64: ${{ secrets.SPECIAL_RUT_B64 }}
       ACTIVE_RUTS_B64: ${{ secrets.ACTIVE_RUTS_B64 }}
-      EXCEPTIONS_RUTS_B64: ${{ secrets.EXCEPTIONS_RUTS_B64 }}
       TZ: "America/Santiago"
 
     steps:

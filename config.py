@@ -31,23 +31,20 @@ class Config:
         
         # Cargar valores base64 encoded para mayor seguridad
         self.ruts_env_b64 = os.getenv('ACTIVE_RUTS_B64')
-        self.exceptions_ruts_env_b64 = os.getenv('EXCEPTIONS_RUTS_B64')
         self.special_email_b64 = os.getenv('SPECIAL_EMAIL_TO')
         self.default_email_b64 = os.getenv('DEFAULT_EMAIL_TO')
         self.special_rut_b64 = os.getenv('SPECIAL_RUT_B64')
-        
+
         # Mantener compatibilidad con versiones legacy (sin base64)
         self.ruts_env = os.getenv('ACTIVE_RUTS')
-        self.exceptions_ruts_env = os.getenv('EXCEPTIONS_RUTS')
         
         # Procesar booleanos
         self.DEBUG_MODE = self.debug_mode.lower() == "true" if self.debug_mode else False
         self.CLOCK_IN_ACTIVE = self.clock_in_active.lower() == "true" if self.clock_in_active else False
     
     def _process_ruts(self):
-        """Procesar RUTs activos y de excepción desde base64."""
+        """Procesar RUTs activos desde base64."""
         self.ACTIVE_RUTS = []
-        self.EXCEPTIONS_RUTS = []
         
         # Procesar RUTs activos (priorizar base64)
         ruts_source = self.ruts_env_b64 or self.ruts_env
@@ -75,31 +72,6 @@ class Config:
         else:
             self._exit_with_error("CRITICAL: No se configuró el secreto ACTIVE_RUTS_B64 o ACTIVE_RUTS")
         
-        # Procesar RUTs de excepción (priorizar base64)
-        exceptions_source = self.exceptions_ruts_env_b64 or self.exceptions_ruts_env
-        if exceptions_source:
-            try:
-                # Intentar decodificar base64 primero
-                if self.exceptions_ruts_env_b64:
-                    exceptions_json = base64.b64decode(self.exceptions_ruts_env_b64).decode('utf-8')
-                    if self.DEBUG_MODE:
-                        print(f"🔍 DEBUG - Excepciones decodificadas desde base64: {exceptions_json}")
-                else:
-                    exceptions_json = self.exceptions_ruts_env
-                    if self.DEBUG_MODE:
-                        print(f"🔍 DEBUG - Excepciones cargadas directamente (sin base64): {exceptions_json}")
-                
-                exceptions_list = json.loads(exceptions_json)
-                # CORRECCIÓN: No agregar 'k' automáticamente - usar RUTs tal como están configurados
-                self.EXCEPTIONS_RUTS = [str(rut) for rut in exceptions_list]
-                print(f"🚫 RUTs de excepción cargados: {len(self.EXCEPTIONS_RUTS)} RUTs")
-                logging.info(f"RUTs de excepción configurados: {[rut[:4] + '****' for rut in self.EXCEPTIONS_RUTS]}")
-            except (json.JSONDecodeError, Exception) as e:
-                print(f"⚠️ Error procesando EXCEPTIONS_RUTS: {str(e)}")
-                logging.error(f"Error procesando EXCEPTIONS_RUTS: {str(e)}")
-                self.EXCEPTIONS_RUTS = []
-        else:
-            print("ℹ️ No se definieron RUTs de excepción")
     
     def get_default_email(self) -> str:
         """Obtener el email por defecto decodificado desde base64."""
@@ -152,7 +124,6 @@ class Config:
         print(f"🔍 DEBUG - Variable clock_in_active cargada: '{self.clock_in_active}'")
         print(f"🔍 DEBUG - Variable CLOCK_IN_ACTIVE calculada: {self.CLOCK_IN_ACTIVE}")
         print(f"🔍 DEBUG - RUTs activos: {[rut[:4] + '****' for rut in self.ACTIVE_RUTS]}")
-        print(f"🔍 DEBUG - RUTs de excepción: {[rut[:4] + '****' for rut in self.EXCEPTIONS_RUTS]}")
     
     def get_email_destinations(self, rut: str) -> list:
         """Determinar emails de destino basado en el RUT.
