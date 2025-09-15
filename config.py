@@ -64,7 +64,8 @@ class Config:
                         print(f"🔍 DEBUG - RUTs cargados directamente (sin base64): {ruts_json}")
                 
                 ruts_list = json.loads(ruts_json)
-                self.ACTIVE_RUTS = [str(rut) + ('k' if str(rut)[-1:].isdigit() else '') for rut in ruts_list]
+                # CORRECCIÓN: No agregar 'k' automáticamente - usar RUTs tal como están configurados
+                self.ACTIVE_RUTS = [str(rut) for rut in ruts_list]
                 print(f"✅ RUTs activos cargados: {len(self.ACTIVE_RUTS)} RUTs")
                 logging.info(f"RUTs activos configurados: {[rut[:4] + '****' for rut in self.ACTIVE_RUTS]}")
             except (json.JSONDecodeError, Exception) as e:
@@ -89,9 +90,8 @@ class Config:
                         print(f"🔍 DEBUG - Excepciones cargadas directamente (sin base64): {exceptions_json}")
                 
                 exceptions_list = json.loads(exceptions_json)
-                self.EXCEPTIONS_RUTS = [
-                    str(rut) + ('k' if str(rut)[-1:].isdigit() else '') for rut in exceptions_list
-                ]
+                # CORRECCIÓN: No agregar 'k' automáticamente - usar RUTs tal como están configurados
+                self.EXCEPTIONS_RUTS = [str(rut) for rut in exceptions_list]
                 print(f"🚫 RUTs de excepción cargados: {len(self.EXCEPTIONS_RUTS)} RUTs")
                 logging.info(f"RUTs de excepción configurados: {[rut[:4] + '****' for rut in self.EXCEPTIONS_RUTS]}")
             except (json.JSONDecodeError, Exception) as e:

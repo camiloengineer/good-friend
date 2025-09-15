@@ -1,19 +1,75 @@
-name: Turno de Marcaje
+name: Sistema de Marcaje Automático - Enterprise
 
 on:
   schedule:
-    - cron: "10 12 * * 1-5" # 08:10 CLT (Lunes a Viernes)
-    - cron: "30 21 * * 1-5" # 17:30 CLT (Lunes a Viernes)
-  push:
-    branches: ["main"]
+    # HORARIO DE VERANO (septiembre - marzo): UTC-3
+    - cron: "10 11 * * 1-5" # 08:10 CLT (Lunes a Viernes) - VERANO
+    - cron: "30 20 * * 1-5" # 17:30 CLT (Lunes a Viernes) - VERANO
+    
+    # HORARIO DE INVIERNO (marzo - septiembre): UTC-4 (comentado)
+    # - cron: "10 12 * * 1-5" # 08:10 CLT (Lunes a Viernes) - INVIERNO
+    # - cron: "30 21 * * 1-5" # 17:30 CLT (Lunes a Viernes) - INVIERNO
+    
+    # Mantener repositorio activo - cada 15 días a las 6:00 UTC (3:00 CLT)
+    - cron: "0 6 1,15 * *" # Día 1 y 15 de cada mes
+  
+  # push:
+  #   branches: ["main"]
+  
   workflow_dispatch:
+    inputs:
+      debug_mode:
+        description: "Forzar modo DEBUG"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 jobs:
+  # Job para mantener el repositorio activo
+  keep-alive:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 6 1,15 * *'
+    permissions:
+      contents: write  # Necesario para hacer push
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configurar Git
+        run: |
+          git config --local user.email "camilo@camiloengineer.com"
+          git config --local user.name "Camilo González"
+
+      - name: Actualizar timestamp de keep-alive
+        run: |
+          echo "# Keep Alive" > .github/keep-alive.txt
+          echo "Last update: $(date -u)" >> .github/keep-alive.txt
+          echo "Run number: ${{ github.run_number }}" >> .github/keep-alive.txt
+          echo "Maintaining repository activity to prevent workflow deactivation" >> .github/keep-alive.txt
+
+      - name: Commit y push cambios
+        run: |
+          git add .github/keep-alive.txt
+          if git diff --staged --quiet; then
+            echo "No hay cambios para commit"
+          else
+            git commit -m "chore: update keep-alive timestamp [skip ci]"
+            git push
+            echo "✅ Keep-alive commit realizado exitosamente"
+          fi
+
   marcar-turno:
     runs-on: ubuntu-latest
+    if: github.event.schedule != '0 6 1,15 * *'
+    timeout-minutes: 60  # 1 hora - Tiempo suficiente para procesos de marcaje
     env:
       CLOCK_IN_ACTIVE: ${{ secrets.CLOCK_IN_ACTIVE }}
-      DEBUG_MODE: ${{ secrets.DEBUG_MODE }}
+      DEBUG_MODE: ${{ github.event.inputs.debug_mode || secrets.DEBUG_MODE }}
       EMAIL_ADDRESS_B64: ${{ secrets.EMAIL_ADDRESS_B64 }}
       EMAIL_PASS_B64: ${{ secrets.EMAIL_PASS_B64 }}
       SPECIAL_EMAIL_TO: ${{ secrets.SPECIAL_EMAIL_TO }}
@@ -30,34 +86,85 @@ jobs:
       - name: Configurar Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10"
+          python-version: "3.11"
+          cache: 'pip'
 
-      - name: Instalar dependencias (si existen)
+      - name: Instalar Chrome
         run: |
-          if [ -s requirements.txt ]; then
+          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           else
-            echo "No hay dependencias que instalar"
+            echo "⚠️ No se encontró requirements.txt"
+            exit 1
           fi
 
-      - name: Crear directorio de logs
-        run: mkdir -p logs
-
-      - name: Ejecutar script main.py
+      - name: Crear directorios necesarios
         run: |
-          echo "🚀 Iniciando script de marcaje..."
-          python main.py
-          echo "✅ Script finalizado"
+          mkdir -p logs reports backups
+
+      - name: Verificar configuración básica
+        run: |
+          echo "🔧 Verificando configuración básica..."
+          python -c "
+          from dotenv import load_dotenv
+          import os
+          load_dotenv()
+          print('✅ Configuración verificada')
+          print(f'DEBUG_MODE: {os.getenv(\"DEBUG_MODE\", \"false\")}')
+          print(f'CLOCK_IN_ACTIVE: {os.getenv(\"CLOCK_IN_ACTIVE\", \"true\")}')
+          " || echo "⚠️ Verificación falló, continuando..."
+
+      - name: Ejecutar sistema de marcaje
+        run: |
+          echo "🚀 Iniciando sistema de marcaje..."
+          echo "⏰ Hora de inicio: $(date)"
+          echo "🔧 DEBUG_MODE: $DEBUG_MODE"
+          python main.py || {
+            echo "❌ Error en ejecución principal"
+            exit 1
+          }
+          echo "✅ Sistema finalizado exitosamente"
+          echo "⏰ Hora de fin: $(date)"
         env:
           PYTHONUNBUFFERED: 1
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
-          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
 
-      - name: Listar archivos de log
+      - name: Generar reporte post-ejecución
+        if: always()
+        run: |
+          echo "📊 Generando reporte post-ejecución..."
+          python -c "
+          try:
+              import os
+              from datetime import datetime
+              print('📊 Reporte simple:')
+              print(f'   Timestamp: {datetime.now()}')
+              print(f'   Run number: {os.environ.get(\"GITHUB_RUN_NUMBER\", \"N/A\")}')
+              print(f'   Debug mode: {os.environ.get(\"DEBUG_MODE\", \"false\")}')
+              if os.path.exists('logs'):
+                  logs = [f for f in os.listdir('logs') if f.endswith('.log')]
+                  print(f'   Logs generados: {len(logs)}')
+              print('✅ Reporte generado')
+          except Exception as e:
+              print(f'⚠️ Error en reporte: {e}')
+          "
+
+      - name: Mostrar estadísticas
         if: always()
         run: |
           echo "📁 Contenido del directorio logs:"
-          ls -la logs/
+          ls -la logs/ || echo "No hay logs"
+          echo ""
+          echo "📊 Archivos de reporte:"
+          ls -la *.json 2>/dev/null || echo "No hay reportes JSON"
 
       - name: Subir archivo de logs
         if: always()
