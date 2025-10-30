@@ -1,4 +1,4 @@
-# good-friend [marcación automatizada]
+# good-friend
 
 Sistema de marcaje automático creado con magia negra, un toque de rebelión y actitud punk.
 No sigue reglas corporativas ni estándares de compliance, pero... **funciona**.
