@@ -1,45 +1,47 @@
-# good-friend [marcacion-automatizada]
+# good-friend [marcación automatizada]
 
-🚨 Aviso: Este sistema es para fines educativos y experimentales. Úsalo bajo tu propio riesgo. Los bugs abundan. No recomendado para vida real.
+Sistema de marcaje automático creado con magia negra, un toque de rebelión y actitud punk.  
+No sigue reglas corporativas ni estándares de compliance, pero… **funciona**.
 
-## Estructura del Proyecto
+> “Don’t try this at home (unless you’re punk enough).”
+
+## ⚡️ Disclaimer honesto
+
+- No fue hecho para empresas... pero las empresas terminarán usándolo igual.
+- Cero bugs reportados. Si los encuentras, eres parte de la leyenda.
+- Código escrito por diversión y rebeldía, funcional por accidente — o por magia negra.
+- No apto para fans del compliance, sí para espíritus libres y devs curiosos.
+- Si llegaste aquí, ya eres parte del chiste.
+
+## Estructura
 
 ```
 good-friend/
 ├── main.py
 ├── config.py
 ├── services/
-│   ├── __init__.py
 │   ├── email_service.py
 │   ├── holiday_service.py
 │   └── marcaje_service.py
 ├── utils/
-│   ├── __init__.py
 │   ├── delay_manager.py
 │   └── rut_validator.py
 ├── tests/
-│   ├── __init__.py
 │   └── test_email_service.py
 ├── logs/
-├── __init__.py
 ├── requirements.txt
 ├── .env
-└── README
+└── README.md
 ```
 
-## Configuración
+## Instalación y magia
 
 ```bash
 pip install -r requirements.txt
-```
-
-## Uso
-
-```bash
 python main.py
 ```
 
-## Testing
+## Testing (solo si eres punk)
 
 ```bash
 pytest tests/ -v
