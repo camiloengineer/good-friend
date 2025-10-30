@@ -159,15 +159,18 @@ Este es un email automático de health check."""
         try:
             from selenium import webdriver
             from selenium.webdriver.chrome.options import Options
-            
+            from selenium.webdriver.chrome.service import Service
+            from webdriver_manager.chrome import ChromeDriverManager
+
             # Verificar que Chrome está disponible
             options = Options()
             options.add_argument("--headless")
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
-            
+
             # Test rápido de inicialización
-            driver = webdriver.Chrome(options=options)
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=options)
             driver.get("about:blank")
             driver.quit()
             

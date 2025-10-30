@@ -10,8 +10,10 @@ from time import sleep
 from typing import List, Dict, Tuple, Optional
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import WebDriverException, TimeoutException
+from webdriver_manager.chrome import ChromeDriverManager
 
 from utils.rut_validator import RutValidator
 from utils.delay_manager import DelayManager
@@ -124,7 +126,8 @@ class MarcajeService:
         options = self._get_chrome_options()
         
         print(f"🌐 [Hilo {current_thread.name}] Iniciando navegador sin geolocalización...")
-        driver = webdriver.Chrome(options=options)
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=options)
 
         try:
             # Deshabilitar geolocalización con JavaScript
